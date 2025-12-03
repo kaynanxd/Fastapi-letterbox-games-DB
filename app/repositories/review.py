@@ -8,7 +8,6 @@ class ReviewRepository:
         self.session = session
 
     async def create_review(self, review: Avaliacao) -> Avaliacao:
-        """Cria uma avaliação (Sem plataforma)."""
         stmt = text("""
             INSERT INTO avaliacoes (nota, comentario, id_jogo, id_user)
             VALUES (:nota, :comment, :jid, :uid)
@@ -28,7 +27,6 @@ class ReviewRepository:
         return review
 
     async def get_reviews_by_game(self, game_id: int) -> list[dict]:
-        """Busca avaliações de um jogo."""
         stmt = text("""
             SELECT a.id_avaliacao, a.nota, a.comentario, a.id_jogo, a.id_user, u.username
             FROM avaliacoes a
@@ -66,3 +64,13 @@ class ReviewRepository:
         await self.session.commit()
         await self.session.refresh(review)
         return review
+    
+    async def get_by_id(self, review_id: int) -> Avaliacao | None:
+        stmt = select(Avaliacao).where(Avaliacao.id_avaliacao == review_id)
+        result = await self.session.execute(stmt)
+        return result.scalars().first()
+
+    async def delete_review_by_id(self, review_id: int):
+        stmt = text("DELETE FROM avaliacoes WHERE id_avaliacao = :id")
+        await self.session.execute(stmt, {"id": review_id})
+        await self.session.commit()

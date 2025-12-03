@@ -1,6 +1,8 @@
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.user import User
+from sqlalchemy import select, update, text
+
 
 class UserRepository:
 
@@ -10,9 +12,7 @@ class UserRepository:
     async def get_by_email_or_username(
         self, email: str, username: str
     ) -> User | None:
-        """
-        Busca um usuário por email OU username.
-        """
+
         stmt = text("""
             SELECT id, username, email, password, admin 
             FROM users 
@@ -42,9 +42,7 @@ class UserRepository:
             username: str | None = None,
             email: str | None = None,
         ) -> tuple[list[User], int]:
-            """
-            Busca usuários com paginação e filtros.
-            """
+
             base_query = "SELECT id, username, email, password, admin FROM users WHERE 1=1"
             count_query = "SELECT count(*) FROM users WHERE 1=1"
             params = {"limit": limit, "offset": offset}
@@ -80,7 +78,6 @@ class UserRepository:
             return users, total or 0
 
     async def create_user(self, user: User) -> User:
-        """Cria um novo usuário"""
         stmt = text("""
             INSERT INTO users (username, email, password, admin)
             VALUES (:username, :email, :password, :admin)
@@ -102,7 +99,6 @@ class UserRepository:
         return user
 
     async def update_user(self, user: User) -> User:
-        """Atualiza um usuário existente usando UPDATE SQL."""
         stmt = text("""
             UPDATE users 
             SET username = :username, email = :email, password = :password, admin = :admin
@@ -122,7 +118,6 @@ class UserRepository:
         return user
 
     async def get_by_id(self, user_id: int) -> User | None:
-        """Busca um usuário pelo ID"""
         stmt = text("SELECT id, username, email, password, admin FROM users WHERE id = :id")
         result = await self.session.execute(stmt, {"id": user_id})
         row = result.mappings().first()
@@ -137,9 +132,9 @@ class UserRepository:
             u.admin = bool(row.admin)
             return u
         return None
+
     
     async def get_by_email(self, email: str) -> User | None:
-        """Busca um usuário pelo Email."""
         stmt = text("SELECT id, username, email, password, admin FROM users WHERE email = :email")
         result = await self.session.execute(stmt, {"email": email})
         row = result.mappings().first()
@@ -156,7 +151,26 @@ class UserRepository:
         return None
 
     async def hard_delete_user(self, user: User) -> None:
-        """Deleta um usuário permanentemente"""
         stmt = text("DELETE FROM users WHERE id = :id")
         await self.session.execute(stmt, {"id": user.id})
         await self.session.commit()
+
+    async def get_by_id2(self, user_id: int) -> User | None:
+
+        stmt = select(User).where(User.id == user_id)
+        result = await self.session.execute(stmt)
+        return result.scalars().first()
+
+    async def update_user_pictures(self, user_id: int, profile_url: str | None, background_url: str | None) -> None:
+        
+        user_to_update = await self.get_by_id2(user_id) 
+        
+        if user_to_update:
+            
+            if profile_url is not None:
+                 user_to_update.profile_pic_url = profile_url
+            
+            if background_url is not None:
+                 user_to_update.background_pic_url = background_url
+
+            await self.session.commit() 

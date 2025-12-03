@@ -87,11 +87,27 @@ class WatchlistService:
         return await self.repository.create_watchlist(watchlist)
         
     async def get_watchlist_details(self, user_id: int, watchlist_id: int) -> Watchlist:
-        watchlist = await self.repository.get_watchlist_by_id(watchlist_id)
-        if not watchlist:
-             raise HTTPException(status_code=404, detail="Watchlist não encontrada")
+            watchlist = await self.repository.get_watchlist_by_id(watchlist_id)
+            if not watchlist:
+                raise HTTPException(status_code=404, detail="Watchlist não encontrada")
+            
+            for item in watchlist.jogos_associacao:
+                jogo = item.jogo
+                avaliacoes = jogo.avaliacoes
+                
+                if avaliacoes:
+                    media = sum(a.nota for a in avaliacoes) / len(avaliacoes)
+                    jogo.media_geral = round(media, 1)
+                else:
+                    jogo.media_geral = None
 
-        return watchlist
+                user_review = next((a for a in avaliacoes if a.id_user == user_id), None)
+                if user_review:
+                    jogo.nota_usuario = user_review.nota
+                else:
+                    jogo.nota_usuario = None
+
+            return watchlist
 
     async def get_user_watchlists(self, user_id: int) -> list[Watchlist]:
         return await self.repository.get_user_watchlists(user_id)
@@ -123,7 +139,14 @@ class WatchlistService:
                 c_country_id = c_data.get("country")
                 c_start_ts = c_data.get("start_date")
 
-                dt_fundacao = datetime.fromtimestamp(c_start_ts).date() if c_start_ts else None
+
+                dt_fundacao = None
+                if c_start_ts:
+                    try:
+
+                        dt_fundacao = datetime.fromtimestamp(c_start_ts).date()
+                    except (OSError, ValueError):
+                        dt_fundacao = None
                 
                 pais_nome, mercado_nome = resolve_country_and_market(c_country_id)
 
@@ -239,3 +262,93 @@ class WatchlistService:
             screenshots=images_list,
             videos=videos           
         )
+    async def remove_game_from_watchlist(self, user_id: int, watchlist_id: int, game_id: int):
+        """
+        Remove um jogo específico de uma watchlist, verificando a propriedade.
+        """
+        watchlist = await self.repository.get_watchlist_by_id(watchlist_id)
+        if not watchlist:
+             raise HTTPException(status_code=HTTPStatus.NOT_FOUND, detail="Watchlist não encontrada")
+
+        if watchlist.id_user != user_id:
+             raise HTTPException(status_code=HTTPStatus.FORBIDDEN, detail="Acesso negado: Watchlist pertence a outro usuário")
+
+        game_ids_in_list = {j.id_jogo for j in watchlist.jogos}
+        if game_id not in game_ids_in_list:
+             raise HTTPException(status_code=HTTPStatus.NOT_FOUND, detail="Jogo não está nesta watchlist")
+
+        await self.repository.unlink_watchlist_game(watchlist_id, game_id)
+        return {"message": "Jogo removido da watchlist com sucesso"}
+
+    async def delete_watchlist(self, user_id: int, watchlist_id: int):
+        """
+        Deleta uma watchlist inteira, verificando a propriedade.
+        """
+        watchlist = await self.repository.get_watchlist_by_id(watchlist_id)
+        if not watchlist:
+            raise HTTPException(status_code=HTTPStatus.NOT_FOUND, detail="Watchlist não encontrada")
+
+        if watchlist.id_user != user_id:
+            raise HTTPException(status_code=HTTPStatus.FORBIDDEN, detail="Acesso negado: Watchlist pertence a outro usuário")
+
+        await self.repository.delete_watchlist_by_id(watchlist_id)
+        return {"message": "Watchlist deletada permanentemente"}
+    
+    async def add_game_to_favorites(self, user_id: int, igdb_game_id: int) -> Watchlist:
+        """
+        Garante que a watchlist 'Favoritos' exista e adiciona o jogo a ela.
+        """
+        FAVORITES_NAME = "Favoritos"
+        
+        favorites_list = await self.repository.get_watchlist_by_user_and_name(user_id, FAVORITES_NAME)
+
+        if not favorites_list:
+            favorites_list = await self.create_watchlist(user_id, FAVORITES_NAME)
+            print(f"Watchlist 'Favoritos' criada para o usuário {user_id}")
+
+        return await self.add_igdb_game_to_watchlist(
+            user_id=user_id,
+            watchlist_id=favorites_list.id_watchlist,
+            igdb_game_id=igdb_game_id
+        )
+    
+    async def remove_game_from_favorites(self, user_id: int, game_id: int):
+
+        FAVORITES_NAME = "Favoritos"
+        
+        favorites_list = await self.repository.get_watchlist_by_user_and_name(user_id, FAVORITES_NAME)
+
+        if not favorites_list:
+            raise HTTPException(
+                status_code=HTTPStatus.NOT_FOUND, 
+                detail=f"A watchlist '{FAVORITES_NAME}' não existe para este usuário."
+            )
+
+        await self.remove_game_from_watchlist(
+            user_id=user_id,
+            watchlist_id=favorites_list.id_watchlist,
+            game_id=game_id
+        )
+        
+        return {"message": "Jogo removido dos Favoritos com sucesso."}
+    
+    async def update_game_status_in_watchlist(self, user_id: int, watchlist_id: int, game_id: int, new_status: str):
+        """Verifica a posse da watchlist e atualiza o status do jogo."""
+        
+        watchlist = await self.repository.get_watchlist_by_id(watchlist_id)
+        
+        if not watchlist:
+            raise HTTPException(
+                status_code=HTTPStatus.NOT_FOUND,
+                detail="Watchlist não encontrada ou não pertence ao usuário."
+            )
+
+        updated_assoc = await self.repository.update_game_status(watchlist_id, game_id, new_status)
+
+        if not updated_assoc:
+            raise HTTPException(
+                status_code=HTTPStatus.NOT_FOUND,
+                detail="Jogo não encontrado nesta watchlist."
+            )
+
+        return await self.get_watchlist_details(user_id, watchlist_id)

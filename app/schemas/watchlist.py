@@ -1,5 +1,6 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from datetime import date
+from enum import Enum 
 
 class GenrePublic(BaseModel):
     id_genero: int
@@ -14,7 +15,6 @@ class PlatformPublic(BaseModel):
 class JogoPlataformaPublic(BaseModel):
     data_lancamento: date | None = None
     plataforma: PlatformPublic
-    
     class Config: from_attributes = True
 
 class CompanyPublic(BaseModel):
@@ -22,8 +22,8 @@ class CompanyPublic(BaseModel):
     nome: str
     pais_origem: str | None = None
     mercado_principal: str | None = None
+    data_fundacao: date | None = None
     class Config: from_attributes = True
-    
 
 class DLCPublic(BaseModel):
     nome_dlc: str
@@ -35,18 +35,15 @@ class GameDetailsPublic(BaseModel):
     titulo: str
     descricao: str | None = None
     nota_metacritic: int | None = None
-    
     desenvolvedora: CompanyPublic | None = None
     publicadora: CompanyPublic | None = None
+    nota_usuario: float | None = None  
+    media_geral: float | None = None  
     generos: list[GenrePublic] = []
     dlcs: list[DLCPublic] = []
-
-
     plataformas_associacao: list[JogoPlataformaPublic] = [] 
-
     class Config:
         from_attributes = True
-
 
 class IGDBGameResult(BaseModel):
     id: int
@@ -60,32 +57,36 @@ class IGDBGameList(BaseModel):
     results: list[IGDBGameResult]
 
 class WatchlistCreate(BaseModel):
-    """Agora exige um nome para criar a watchlist."""
     nome: str 
 
-class WatchlistPublic(BaseModel):
-    """Retorno público atualizado."""
-    id_watchlist: int
-    id_user: int
-    nome: str | None = None
-    
-    jogos: list[GameDetailsPublic] = [] 
-
+class WatchlistGameItem(BaseModel):
+    status_jogo: str
+    jogo: GameDetailsPublic
     class Config:
         from_attributes = True
 
-        
-
+class WatchlistPublic(BaseModel):
+    id_watchlist: int
+    id_user: int
+    nome: str | None = None
+    jogos: list[WatchlistGameItem] = Field(default=[], validation_alias="jogos_associacao")
+    class Config:
+        from_attributes = True
 
 class WatchlistPublic2(BaseModel):
-    """Retorno público atualizado."""
     id_watchlist: int
     id_user: int
     nome: str | None = None 
-
-
     class Config:
         from_attributes = True
 
 class AddGameToWatchlist(BaseModel):
     igdb_game_id: int
+
+class GameStatus(str, Enum):
+    JOGADO = "JOGADO"
+    AINDA_NAO_JOGADO = "AINDA NAO JOGADO"
+    DROPADO = "DROPADO"
+
+class UpdateGameStatus(BaseModel):
+    new_status: GameStatus = Field(..., description="Novo status do jogo na watchlist.")

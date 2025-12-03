@@ -1,18 +1,20 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException
 from http import HTTPStatus
+from fastapi import UploadFile, File
 
 from app.schemas.user import (
     UserSchemaPublic,
     UserSchemaList,
     UserSchema,       
     UserSchemaUpdate,
+    UserPictureUrls
 )
 from app.schemas.common import Message, FilterPage 
 
 from app.dependencies import (
     UserServiceDep,
     CurrentUser,
-    AdminUser
+    AdminUser,
 )
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -50,14 +52,15 @@ async def ler_todos_usuarios(
         email=email
     )
 
-@router.put('/atualizar/{user_id}', response_model=UserSchemaPublic)
+
+@router.patch('/atualizar/{user_id}', response_model=UserSchemaPublic)
 async def atualizar_usuario(
     user_id: int,
     user_schema: UserSchemaUpdate,
     service: UserServiceDep,
     current_user: CurrentUser,
 ):
-    """Atualiza um usuário."""
+    """Atualiza parcialmente um usuário."""
     return await service.update_existing_user(
         user_id=user_id, user_schema=user_schema, current_user=current_user
     )
@@ -94,3 +97,33 @@ async def rebaixar_usuario(
     """Rebaixa um usuário de admin (Admin)."""
     user = await service.demote_user_from_admin(user_id=user_id)
     return user
+
+@router.patch("/me/upload-pictures")
+async def upload_pictures(
+    current_user: CurrentUser, 
+    service: UserServiceDep,
+    profile_pic: UploadFile = File(None, description="Foto de Perfil (Opcional)"),
+    background_pic: UploadFile = File(None, description="Foto de Fundo (Opcional)"),
+):
+    """
+    Permite ao usuário logado fazer upload da foto de perfil e/ou de fundo.
+    Salva os arquivos localmente e os caminha no banco de dados.
+    """
+    if not (profile_pic or background_pic):
+         raise HTTPException(status_code=400, detail="Nenhum arquivo enviado.")
+         
+    return await service.upload_user_pictures(
+        user_id=current_user.id,
+        profile_pic=profile_pic,
+        background_pic=background_pic
+    )
+
+@router.get('/me/pictures', response_model=UserPictureUrls)
+async def ler_urls_fotos(
+    current_user: CurrentUser,
+    service: UserServiceDep 
+):
+    """
+    Retorna os URLs das fotos do perfil e de fundo do usuário logado
+    """
+    return await service.get_user_pictures_urls(current_user.id)

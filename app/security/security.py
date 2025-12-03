@@ -119,7 +119,6 @@ async def get_admin_user(
     return current_user
 
 def create_verification_token(data: dict) -> str:
-    """Cria um token JWT de curta duração para verificação de email."""
     
     expires_delta = timedelta(hours=1)
     
@@ -128,7 +127,6 @@ def create_verification_token(data: dict) -> str:
     )
 
 def create_password_reset_token(data: dict) -> str:
-    """Cria um token JWT de curta duração para reset de senha."""
     
     expires_delta = timedelta(minutes=15)
     

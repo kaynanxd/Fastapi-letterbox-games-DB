@@ -20,6 +20,8 @@ CREATE TABLE users (
     username VARCHAR(100) NOT NULL UNIQUE,
     email VARCHAR(100) NOT NULL UNIQUE,
     password VARCHAR(255) NOT NULL,
+    profile_pic_url VARCHAR(255),
+    background_pic_url VARCHAR(255),
     admin BOOLEAN NOT NULL DEFAULT 0
 );
 
@@ -100,8 +102,9 @@ CREATE TABLE watchlists (
 CREATE TABLE watchlist_jogo (
     id_watchlist INTEGER NOT NULL,
     id_jogo INTEGER NOT NULL,
+    status_jogo VARCHAR(50) NOT NULL DEFAULT 'AINDA NAO JOGADO',
     PRIMARY KEY (id_watchlist, id_jogo),
-    FOREIGN KEY(id_watchlist) REFERENCES watchlists(id_watchlist),
+    FOREIGN KEY(id_watchlist) REFERENCES watchlists(id_watchlist) ON DELETE CASCADE,
     FOREIGN KEY(id_jogo) REFERENCES jogos(id_jogo)
 );
 

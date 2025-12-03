@@ -4,18 +4,18 @@ from app.models.user import Watchlist, Jogo, Genero, Plataforma, JogoPlataforma
 from sqlalchemy import text, select
 from sqlalchemy.orm import selectinload, joinedload
 from app.models.user import Avaliacao, Jogo
+from app.models.user import Watchlist, Jogo, Genero, Plataforma, JogoWatchlist
 
 class WatchlistRepository:
     def __init__(self, session: AsyncSession):
         self.session = session
 
     async def create_watchlist(self, watchlist: Watchlist) -> Watchlist:
-
             stmt = text("INSERT INTO watchlists (id_user, nome) VALUES (:uid, :nm) RETURNING id_watchlist")
             result = await self.session.execute(stmt, {"uid": watchlist.id_user, "nm": watchlist.nome})
             watchlist.id_watchlist = result.scalar()
             await self.session.commit()
-            watchlist.jogos = []
+
             return watchlist
 
     async def get_user_watchlists(self, user_id: int) -> list[Watchlist]:
@@ -30,24 +30,21 @@ class WatchlistRepository:
         return watchlists
 
     async def get_watchlist_by_id(self, watchlist_id: int) -> Watchlist | None:
-            """
-            Busca a watchlist e carrega recursivamente todas as dependências dos jogos
-            usando o ORM do SQLAlchemy.
-            """
+
             stmt = (
                 select(Watchlist)
                 .where(Watchlist.id_watchlist == watchlist_id)
                 .options(
 
-                    selectinload(Watchlist.jogos).options(
+                    selectinload(Watchlist.jogos_associacao).options( 
                         
-                        selectinload(Jogo.generos),       
-                        selectinload(Jogo.dlcs),          
-
-                        joinedload(Jogo.desenvolvedora),  
-                        joinedload(Jogo.publicadora),
-
-                        selectinload(Jogo.plataformas_associacao).joinedload(JogoPlataforma.plataforma)
+                        joinedload(JogoWatchlist.jogo).options(
+                            selectinload(Jogo.generos), 
+                            selectinload(Jogo.dlcs),
+                            joinedload(Jogo.desenvolvedora), 
+                            joinedload(Jogo.publicadora),selectinload(Jogo.avaliacoes),
+                            selectinload(Jogo.plataformas_associacao).joinedload(JogoPlataforma.plataforma)
+                        )
                     )
                 )
             )
@@ -143,7 +140,6 @@ class WatchlistRepository:
 
 
     async def get_company_by_name(self, name: str) -> int | None:
-        """Busca empresa pelo nome e retorna ID."""
         stmt = text("SELECT id_empresa FROM empresas WHERE nome = :n")
         return await self.session.scalar(stmt, {"n": name})
 
@@ -155,9 +151,7 @@ class WatchlistRepository:
             pais_origem: str=None, 
             mercado_principal: str=None
         ) -> int:
-            """
-            Cria empresa e sua especialização (1:1) com dados preenchidos automaticamente.
-            """
+
             stmt1 = text("""
                 INSERT INTO empresas (nome, tipo_empresa, data_fundacao, pais_origem) 
                 VALUES (:n, :t, :df, :po) 
@@ -192,13 +186,13 @@ class WatchlistRepository:
             return cid
 
     async def create_dlc_raw(self, game_id: int, name: str, desc: str):
-        """Cria DLC vinculada ao jogo."""
+
         stmt = text("INSERT INTO dlcs (id_jogo, nome_dlc, descricao) VALUES (:jid, :n, :d)")
         await self.session.execute(stmt, {"jid": game_id, "n": name, "d": desc})
         await self.session.commit()
     
     async def get_reviews_by_user(self, user_id: int) -> list[Avaliacao]:
-        """Busca todas as reviews de um usuário específico."""
+
         stmt = (
             select(Avaliacao)
             .where(Avaliacao.id_user == user_id)
@@ -210,4 +204,40 @@ class WatchlistRepository:
         result = await self.session.execute(stmt)
         return result.scalars().all()
 
+    async def unlink_watchlist_game(self, watchlist_id: int, game_id: int):
+
+        stmt = text("DELETE FROM watchlist_jogo WHERE id_watchlist = :wid AND id_jogo = :gid")
+        await self.session.execute(stmt, {"wid": watchlist_id, "gid": game_id})
+        await self.session.commit()
+
+    async def delete_watchlist_by_id(self, watchlist_id: int):
+            
+            stmt_unlink = text("DELETE FROM watchlist_jogo WHERE id_watchlist = :wid")
+            await self.session.execute(stmt_unlink, {"wid": watchlist_id})
+            
+            stmt_delete = text("DELETE FROM watchlists WHERE id_watchlist = :wid")
+            await self.session.execute(stmt_delete, {"wid": watchlist_id})
+            
+            await self.session.commit()
+
+    async def get_watchlist_by_user_and_name(self, user_id: int, name: str) -> Watchlist | None:
+        stmt = select(Watchlist).where(Watchlist.id_user == user_id, Watchlist.nome == name)
+        result = await self.session.execute(stmt)
+        return result.scalars().first()
     
+    async def update_game_status(self, watchlist_id: int, game_id: int, new_status: str) -> JogoWatchlist | None:
+        
+        stmt = select(JogoWatchlist).where(
+            JogoWatchlist.id_watchlist == watchlist_id,
+            JogoWatchlist.id_jogo == game_id
+        )
+        result = await self.session.execute(stmt)
+        association = result.scalars().first()
+        
+        if association:
+            association.status_jogo = new_status
+            await self.session.commit()
+            await self.session.refresh(association)
+            return association
+        
+        return None

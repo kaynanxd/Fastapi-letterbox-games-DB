@@ -13,7 +13,7 @@ class ReviewService:
 
     async def create_review(self, user_id: int, game_id: int, schema: ReviewCreate) -> ReviewPublic:
             """
-            Adiciona uma avaliação OU atualiza se já existir (Sobrescreve).
+            Adiciona uma avaliação OU atualiza se já existir (Sobrescrever).
             """
 
             review_existente = await self.review_repo.get_by_user_and_game(user_id, game_id)
@@ -63,3 +63,16 @@ class ReviewService:
 
     async def get_my_reviews(self, user_id: int):
         return await self.review_repo.get_reviews_by_user(user_id)
+
+    async def delete_review(self, user_id: int, review_id: int):
+
+        review = await self.review_repo.get_by_id(review_id) 
+
+        if not review:
+            raise HTTPException(status_code=HTTPStatus.NOT_FOUND, detail="Avaliação não encontrada")
+
+        if (review.id_user != user_id) :
+            raise HTTPException(status_code=HTTPStatus.FORBIDDEN, detail="Acesso negado: Você não é o autor desta avaliação")
+
+        await self.review_repo.delete_review_by_id(review_id)
+        return {"message": "Avaliação deletada com sucesso"}

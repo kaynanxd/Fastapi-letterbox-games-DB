@@ -10,13 +10,26 @@ from sqlalchemy.orm import (
     relationship,
 )
 
+@Base.registry.mapped_as_dataclass
+class JogoWatchlist:
+    __tablename__ = "watchlist_jogo"
 
-watchlist_jogo_table = Table(
-    "watchlist_jogo",
-    Base.metadata,
-    Column("id_watchlist", ForeignKey("watchlists.id_watchlist"), primary_key=True),
-    Column("id_jogo", ForeignKey("jogos.id_jogo"), primary_key=True),
-)
+    id_watchlist: Mapped[int] = mapped_column(
+        ForeignKey("watchlists.id_watchlist", ondelete="CASCADE"), primary_key=True
+    )
+    id_jogo: Mapped[int] = mapped_column(
+        ForeignKey("jogos.id_jogo"), primary_key=True
+    )
+
+    status_jogo: Mapped[str] = mapped_column(
+        String(50), 
+        default="AINDA NAO JOGADO", 
+        server_default="AINDA NAO JOGADO",
+        nullable=False
+    )
+
+    watchlist: Mapped["Watchlist"] = relationship(init=False, back_populates="jogos_associacao")
+    jogo: Mapped["Jogo"] = relationship(init=False, back_populates="watchlists_associacao")
 
 jogo_genero_table = Table(
     "jogo_genero",
@@ -34,6 +47,8 @@ class User:
     username: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
     password: Mapped[str] = mapped_column(String(255), nullable=False)
     email: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
+    profile_pic_url: Mapped[str | None] = mapped_column(String(255), default=None)
+    background_pic_url: Mapped[str | None] = mapped_column(String(255), default=None)
     
     admin: Mapped[bool] = mapped_column(
         init=False, default=False, server_default='false', nullable=False
@@ -45,7 +60,6 @@ class User:
     avaliacoes: Mapped[list["Avaliacao"]] = relationship(
         init=False, back_populates="user", cascade="all, delete-orphan"
     )
-
 
 @Base.registry.mapped_as_dataclass
 class Jogo:
@@ -65,7 +79,6 @@ class Jogo:
         ForeignKey("publicadoras.id_empresa"), default=None, nullable=True
     )
 
-    # Relacionamentos
     desenvolvedora: Mapped["Desenvolvedora"] = relationship(
         init=False, back_populates="jogos_desenvolvidos", foreign_keys=[id_desenvolvedor]
     )
@@ -85,20 +98,24 @@ class Jogo:
         init=False, back_populates="jogo", cascade="all, delete-orphan"
     )
 
-    watchlists: Mapped[list["Watchlist"]] = relationship(
-        init=False, secondary=watchlist_jogo_table, back_populates="jogos"
-    )
+    watchlists_associacao: Mapped[list["JogoWatchlist"]] = relationship(
+            init=False, 
+            back_populates="jogo"
+        )
+
+    @property
+    def watchlists(self) -> list["Watchlist"]:
+        return [assoc.watchlist for assoc in self.watchlists_associacao]
 
     generos: Mapped[list["Genero"]] = relationship(
         init=False, secondary=jogo_genero_table, back_populates="jogos"
     )
 
-
 @Base.registry.mapped_as_dataclass
 class Watchlist:
     __tablename__ = "watchlists"
-
-    id_watchlist: Mapped[int] = mapped_column(init=False, primary_key=True)
+    
+    id_watchlist: Mapped[int] = mapped_column(init=False, primary_key=True) 
     
     id_user: Mapped[int] = mapped_column(
         ForeignKey("users.id"), nullable=False
@@ -108,9 +125,16 @@ class Watchlist:
     
     user: Mapped["User"] = relationship(init=False, back_populates="watchlists")
     
-    jogos: Mapped[list["Jogo"]] = relationship(
-        init=False, secondary=watchlist_jogo_table, back_populates="watchlists"
+
+    jogos_associacao: Mapped[list["JogoWatchlist"]] = relationship(
+        init=False, 
+        back_populates="watchlist",
     )
+
+
+    @property
+    def jogos(self) -> list["Jogo"]:
+            return [assoc.jogo for assoc in self.jogos_associacao]
 
 @Base.registry.mapped_as_dataclass
 class Genero:
@@ -125,9 +149,7 @@ class Genero:
 
 @Base.registry.mapped_as_dataclass
 class Plataforma:
-    """
-    Entidade Plataforma (Ex: PC, PS5, Xbox).
-    """
+
     __tablename__ = "plataformas"
 
     id_plataforma: Mapped[int] = mapped_column(init=False, primary_key=True)
@@ -197,9 +219,7 @@ class DLC:
 
 @Base.registry.mapped_as_dataclass
 class JogoPlataforma:
-    """
-    Entidade Associativa (N:M com atributo extra)
-    """
+
     __tablename__ = "jogo_plataformas"
 
     id_jogo: Mapped[int] = mapped_column(ForeignKey("jogos.id_jogo"), primary_key=True)

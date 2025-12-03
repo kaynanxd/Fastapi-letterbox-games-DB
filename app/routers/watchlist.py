@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
+from http import HTTPStatus
 from app.dependencies import SessionDep, CurrentUser
 from app.services.watchlist import WatchlistService
 from app.repositories.watchlist import WatchlistRepository
@@ -11,9 +12,10 @@ from app.schemas.watchlist import (
     IGDBGameList, IGDBGameResult, WatchlistPublic, AddGameToWatchlist, WatchlistCreate
 )
 from app.schemas.review import MyReviewPublic
+from app.schemas.watchlist import UpdateGameStatus
 
 IGDB_CLIENT_ID = "wsv3svrgvvr70488d7x2qqbzv13432"
-IGDB_CLIENT_SECRET = "lbqzfgxr2d5ciyez9ivgd9b4ouxixi"
+IGDB_CLIENT_SECRET = "n2de8w4urryjkwzikm7rbov1xglrne"
 
 def get_watchlist_service(session: SessionDep):
     repo = WatchlistRepository(session)
@@ -137,4 +139,77 @@ async def ler_todas_reviews_game(
     """
     return await service.get_game_reviews(game_id)
 
+@router.delete("/games/{game_id}/reviews/{review_id}", status_code=HTTPStatus.OK)
+async def delete_review(
+    review_id: int,
+    current_user: CurrentUser,
+    service: ReviewService = Depends(get_review_service)
+):
+    """Deleta uma avaliação específica. Apenas o autor pode deletar."""
+    return await service.delete_review(current_user.id, review_id)
 
+
+@router.delete("/{watchlist_id}/games/{game_id}", status_code=HTTPStatus.OK)
+async def remove_game(
+    watchlist_id: int,
+    game_id: int,
+    current_user: CurrentUser,
+    service: WatchlistService = Depends(get_watchlist_service)
+):
+    """Remove um jogo específico de uma watchlist. Apenas o dono pode remover."""
+    return await service.remove_game_from_watchlist(current_user.id, watchlist_id, game_id)
+
+
+@router.delete("/{watchlist_id}", status_code=HTTPStatus.OK)
+async def delete_watchlist(
+    watchlist_id: int,
+    current_user: CurrentUser,
+    service: WatchlistService = Depends(get_watchlist_service)
+):
+    """Deleta uma watchlist inteira. Apenas o dono pode deletar."""
+    return await service.delete_watchlist(current_user.id, watchlist_id)
+
+@router.post("/favoritos/adicionar-jogo", response_model=WatchlistPublic)
+async def add_game_to_favorites(
+    game_data: AddGameToWatchlist,
+    current_user: CurrentUser,
+    service: WatchlistService = Depends(get_watchlist_service),
+):
+    """
+    Adiciona um jogo à watchlist 'Favoritos' do usuário logado.
+    A lista é criada automaticamente se for a primeira vez.
+    """
+    return await service.add_game_to_favorites(
+        user_id=current_user.id,
+        igdb_game_id=game_data.igdb_game_id
+    )
+
+@router.delete("/favoritos/remover-jogo/{game_id}", status_code=HTTPStatus.OK)
+async def remove_game_from_favorites(
+    game_id: int,
+    current_user: CurrentUser,
+    service: WatchlistService = Depends(get_watchlist_service)
+):
+    """
+    Remove um jogo específico da watchlist 'Favoritos' do usuário logado.
+    """
+    return await service.remove_game_from_favorites(current_user.id, game_id)
+
+@router.patch("/{watchlist_id}/games/{game_id}/status", response_model=WatchlistPublic) 
+async def update_game_playing_status(
+    watchlist_id: int,
+    game_id: int,
+    status_update: UpdateGameStatus,
+    current_user: CurrentUser,
+    service: WatchlistService = Depends(get_watchlist_service)
+):
+    """
+    Atualiza o status de um jogo (JOGADO, AINDA NAO JOGADO, DROPADO) 
+    em uma watchlist específica.
+    """
+    return await service.update_game_status_in_watchlist(
+        user_id=current_user.id,
+        watchlist_id=watchlist_id,
+        game_id=game_id,
+        new_status=status_update.new_status.value
+    )
