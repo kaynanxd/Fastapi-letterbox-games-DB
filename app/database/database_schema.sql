@@ -47,8 +47,9 @@ CREATE TABLE publicadoras (
 
 CREATE TABLE jogos (
     id_jogo INTEGER PRIMARY KEY AUTOINCREMENT,
-    titulo VARCHAR(255) NOT NULL,
+    titulo VARCHAR(255),
     descricao TEXT,
+    capa_url VARCHAR(255),
     nota_metacritic INTEGER,
     id_desenvolvedor INTEGER,
     id_publicadora INTEGER,

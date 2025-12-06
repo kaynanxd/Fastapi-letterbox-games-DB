@@ -127,3 +127,4 @@ async def ler_urls_fotos(
     Retorna os URLs das fotos do perfil e de fundo do usuário logado
     """
     return await service.get_user_pictures_urls(current_user.id)
+

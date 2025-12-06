@@ -38,7 +38,6 @@ class WatchlistService:
         self.igdb_client = igdb_client
 
     def _format_igdb_game(self, item: dict) -> IGDBGameResult:
-        """Helper interno para formatar o JSON cru do IGDB para nosso Schema."""
         cover = item.get("cover", {}).get("url", "")
         if cover:
             cover = "https:" + cover.replace("t_thumb", "t_cover_big")
@@ -171,13 +170,17 @@ class WatchlistService:
                         )
 
             nota = int(igdb_game.get("aggregated_rating", 0)) if igdb_game.get("aggregated_rating") else None
+            cover_url = igdb_game.get("cover", {}).get("url", "")
+            if cover_url:
+                cover_url = "https:" + cover_url.replace("t_thumb", "t_cover_big")
 
             novo_jogo = Jogo(
                 titulo=game_title,
                 descricao=igdb_game.get("summary"),
                 nota_metacritic=nota,
                 id_desenvolvedor=dev_id,
-                id_publicadora=pub_id
+                id_publicadora=pub_id,
+                capa_url=cover_url
             )
             
             game_id = await self.repository.create_game_raw(novo_jogo)
@@ -221,7 +224,6 @@ class WatchlistService:
         return watchlist
     
     def _format_igdb_game(self, item: dict) -> IGDBGameResult:
-        """Helper interno para formatar o JSON cru do IGDB para nosso Schema."""
         
         cover = item.get("cover", {}).get("url", "")
         if cover:
@@ -254,18 +256,30 @@ class WatchlistService:
                     thumb_url = f"https://img.youtube.com/vi/{vid_id}/hqdefault.jpg"
                     images_list.append(thumb_url)
 
+        genres_list = []
+        raw_genres = item.get("genres", [])
+        if raw_genres:
+
+            genres_list = [g.get("name") for g in raw_genres if g.get("name")]
+
+        raw_rating = item.get("aggregated_rating")
+        if raw_rating and raw_rating > 0:
+                    metacritic_rating = round(raw_rating / 10, 2) 
+        else:
+            metacritic_rating = None
+
         return IGDBGameResult(
             id=item["id"],
             name=item["name"],
             summary=item.get("summary"),
             cover_url=cover,
             screenshots=images_list,
-            videos=videos           
+            videos=videos,
+            genres=genres_list,
+            metacritic_rating=metacritic_rating 
         )
     async def remove_game_from_watchlist(self, user_id: int, watchlist_id: int, game_id: int):
-        """
-        Remove um jogo específico de uma watchlist, verificando a propriedade.
-        """
+
         watchlist = await self.repository.get_watchlist_by_id(watchlist_id)
         if not watchlist:
              raise HTTPException(status_code=HTTPStatus.NOT_FOUND, detail="Watchlist não encontrada")
@@ -281,9 +295,7 @@ class WatchlistService:
         return {"message": "Jogo removido da watchlist com sucesso"}
 
     async def delete_watchlist(self, user_id: int, watchlist_id: int):
-        """
-        Deleta uma watchlist inteira, verificando a propriedade.
-        """
+
         watchlist = await self.repository.get_watchlist_by_id(watchlist_id)
         if not watchlist:
             raise HTTPException(status_code=HTTPStatus.NOT_FOUND, detail="Watchlist não encontrada")
@@ -295,9 +307,7 @@ class WatchlistService:
         return {"message": "Watchlist deletada permanentemente"}
     
     async def add_game_to_favorites(self, user_id: int, igdb_game_id: int) -> Watchlist:
-        """
-        Garante que a watchlist 'Favoritos' exista e adiciona o jogo a ela.
-        """
+
         FAVORITES_NAME = "Favoritos"
         
         favorites_list = await self.repository.get_watchlist_by_user_and_name(user_id, FAVORITES_NAME)
@@ -333,7 +343,6 @@ class WatchlistService:
         return {"message": "Jogo removido dos Favoritos com sucesso."}
     
     async def update_game_status_in_watchlist(self, user_id: int, watchlist_id: int, game_id: int, new_status: str):
-        """Verifica a posse da watchlist e atualiza o status do jogo."""
         
         watchlist = await self.repository.get_watchlist_by_id(watchlist_id)
         
@@ -352,3 +361,17 @@ class WatchlistService:
             )
 
         return await self.get_watchlist_details(user_id, watchlist_id)
+    
+    async def get_popular_games_by_genre(self, genre_name: str, limit: int = 20, offset: int = 0) -> list[IGDBGameResult]:
+
+        results = await self.igdb_client.search_games_by_genre(genre_name, limit, offset)
+        
+
+        return [self._format_igdb_game(item) for item in results]
+    
+    async def get_top_games_global(self, limit: int = 20, offset: int = 0) -> list[IGDBGameResult]:
+
+        
+        results = await self.igdb_client.get_all_popular_games(limit, offset)
+        
+        return [self._format_igdb_game(item) for item in results]

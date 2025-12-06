@@ -11,7 +11,7 @@ from app.services.review import ReviewService
 from app.schemas.watchlist import (
     IGDBGameList, IGDBGameResult, WatchlistPublic, AddGameToWatchlist, WatchlistCreate
 )
-from app.schemas.review import MyReviewPublic
+from app.schemas.review import MyReviewPublic, GameRankingPublic
 from app.schemas.watchlist import UpdateGameStatus
 
 IGDB_CLIENT_ID = "wsv3svrgvvr70488d7x2qqbzv13432"
@@ -213,3 +213,50 @@ async def update_game_playing_status(
         game_id=game_id,
         new_status=status_update.new_status.value
     )
+
+@router.get("/games/por-genero/{genre_name}", response_model=IGDBGameList)
+async def listar_games_por_genero(
+    genre_name: str,
+    page: int = Query(1, ge=1, description="Número da página"),
+    limit: int = Query(20, ge=1, le=50, description="Itens por página"),
+    service: WatchlistService = Depends(get_watchlist_service),
+):
+    """
+    Retorna jogos famosos de um determinado gênero (ex: 'RPG', 'Platform' , 'adventure').
+    A busca é feita diretamente no IGDB e ordenada por popularidade.
+    """
+    offset = (page - 1) * limit
+    
+    results = await service.get_popular_games_by_genre(genre_name, limit=limit, offset=offset)
+    
+    if not results and page == 1:
+        raise HTTPException(status_code=404, detail="Nenhum jogo encontrado para este gênero.")
+        
+    return {"results": results}
+
+@router.get("/ranking/top-melhores", response_model=list[GameRankingPublic])
+async def obter_ranking_semanal(
+    service: ReviewService = Depends(get_review_service)
+):
+    """
+    Retorna os 10 jogos com a maior média de notas baseada 
+    nas reviews dos usuários do sistema.
+    """
+    return await service.get_weekly_ranking()
+
+
+@router.get("/games/ranking-global-igdb", response_model=IGDBGameList)
+async def listar_ranking_global(
+    page: int = Query(1, ge=1, description="Número da página"),
+    limit: int = Query(20, ge=1, le=50, description="Itens por página"),
+    service: WatchlistService = Depends(get_watchlist_service),
+):
+    """
+    Retorna os jogos mais famosos de todos os tempos listados no IGDB.
+    Ordenados por popularidade (total de reviews).
+    """
+    offset = (page - 1) * limit
+    
+    results = await service.get_top_games_global(limit=limit, offset=offset)
+    
+    return {"results": results}

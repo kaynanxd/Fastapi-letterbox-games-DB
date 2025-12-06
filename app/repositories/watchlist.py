@@ -69,19 +69,35 @@ class WatchlistRepository:
         return None
 
     async def create_game_raw(self, game: Jogo) -> int:
-        stmt = text("""
-            INSERT INTO jogos (titulo, descricao, nota_metacritic, id_desenvolvedor, id_publicadora)
-            VALUES (:t, :d, :n, :dev, :pub)
-            RETURNING id_jogo
-        """)
-        params = {
-            "t": game.titulo, "d": game.descricao, "n": game.nota_metacritic,
-            "dev": game.id_desenvolvedor, "pub": game.id_publicadora
-        }
-        res = await self.session.execute(stmt, params)
-        new_id = res.scalar()
-        await self.session.commit()
-        return new_id
+
+            stmt = text("""
+                INSERT INTO jogos (
+                    titulo, 
+                    descricao, 
+                    nota_metacritic, 
+                    id_desenvolvedor, 
+                    id_publicadora, 
+                    capa_url
+                )
+                VALUES (:t, :d, :n, :dev, :pub, :capa)
+                RETURNING id_jogo
+            """)
+            
+
+            params = {
+                "t": game.titulo,
+                "d": game.descricao,
+                "n": game.nota_metacritic,
+                "dev": game.id_desenvolvedor,
+                "pub": game.id_publicadora,
+                "capa": game.capa_url  
+            }
+            
+            res = await self.session.execute(stmt, params)
+            new_id = res.scalar()
+            await self.session.commit()
+            
+            return new_id
 
     async def get_genre_by_name(self, name: str) -> Genero | None:
         stmt = text("SELECT * FROM generos WHERE nome_genero = :n")

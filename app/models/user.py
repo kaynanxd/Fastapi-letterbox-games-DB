@@ -74,7 +74,7 @@ class Jogo:
     
     descricao: Mapped[str | None] = mapped_column(Text, default=None)
     nota_metacritic: Mapped[int | None] = mapped_column(default=None)
-    
+    capa_url: Mapped[str | None] = mapped_column(String(255), default=None)
     id_publicadora: Mapped[int | None] = mapped_column(
         ForeignKey("publicadoras.id_empresa"), default=None, nullable=True
     )

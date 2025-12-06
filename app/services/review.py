@@ -76,3 +76,9 @@ class ReviewService:
 
         await self.review_repo.delete_review_by_id(review_id)
         return {"message": "Avaliação deletada com sucesso"}
+    
+    async def get_weekly_ranking(self) -> list[dict]:
+        """
+        Retorna o Top 10 jogos baseados nas avaliações dos usuários.
+        """
+        return await self.review_repo.get_top_rated_games(limit=10)

@@ -52,6 +52,8 @@ class IGDBGameResult(BaseModel):
     cover_url: str | None = None
     screenshots: list[str] = [] 
     videos: list[str] = []     
+    genres: list[str] = []
+    metacritic_rating: float | None
 
 class IGDBGameList(BaseModel):
     results: list[IGDBGameResult]
@@ -90,3 +92,5 @@ class GameStatus(str, Enum):
 
 class UpdateGameStatus(BaseModel):
     new_status: GameStatus = Field(..., description="Novo status do jogo na watchlist.")
+
+    

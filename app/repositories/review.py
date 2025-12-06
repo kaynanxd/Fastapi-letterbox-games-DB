@@ -1,6 +1,7 @@
-from sqlalchemy import text, select
+from sqlalchemy import text, select, func, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import selectinload
 from app.models.user import Avaliacao, Jogo 
 
 class ReviewRepository:
@@ -74,3 +75,44 @@ class ReviewRepository:
         stmt = text("DELETE FROM avaliacoes WHERE id_avaliacao = :id")
         await self.session.execute(stmt, {"id": review_id})
         await self.session.commit()
+
+    async def get_top_rated_games(self, limit: int = 10) -> list[dict]:
+            """
+            Retorna:
+            - O Objeto Jogo (com capa e generos carregados)
+            - A Média calculada
+            - O Total de reviews
+            """
+            stmt = (
+                select(
+                    Jogo, 
+                    func.avg(Avaliacao.nota).label("media"),
+                    func.count(Avaliacao.id_avaliacao).label("total")
+                )
+                .join(Avaliacao, Jogo.id_jogo == Avaliacao.id_jogo)
+                .options(selectinload(Jogo.generos)) # Carrega os gêneros associados
+                .group_by(Jogo.id_jogo) # Agrupa pelo ID do jogo
+                .order_by(desc("media"))
+                .limit(limit)
+            )
+
+            result = await self.session.execute(stmt)
+            
+            ranking = []
+            for row in result:
+                jogo_obj = row.Jogo
+                media_calc = row.media
+                total_calc = row.total
+                
+                # Montamos o dicionário manualmente para o Pydantic,
+                # combinando dados do objeto Jogo com os dados calculados (agregados)
+                ranking.append({
+                    "id_jogo": jogo_obj.id_jogo,
+                    "titulo": jogo_obj.titulo,
+                    "capa_url": jogo_obj.capa_url,     # Pega do banco
+                    "generos": jogo_obj.generos,       # Pega do relacionamento
+                    "media": round(media_calc, 2),
+                    "total_reviews": total_calc
+                })
+                
+            return ranking

@@ -31,3 +31,17 @@ class MyReviewPublic(BaseModel):
 class ReviewList(BaseModel):
     items: list[ReviewPublic]
     media_nota: float | None = None
+
+class GenreSimple(BaseModel):
+    nome_genero: str
+    class Config: from_attributes = True
+
+class GameRankingPublic(BaseModel):
+    id_jogo: int
+    titulo: str
+    media: float
+    total_reviews: int
+    capa_url: str | None = None
+    generos: list[GenreSimple]
+    class Config:
+        from_attributes = True
