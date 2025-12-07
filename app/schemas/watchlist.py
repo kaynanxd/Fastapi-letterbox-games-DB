@@ -54,6 +54,8 @@ class IGDBGameResult(BaseModel):
     videos: list[str] = []     
     genres: list[str] = []
     metacritic_rating: float | None
+    developer: str | None = None
+    publisher: str | None = None
 
 class IGDBGameList(BaseModel):
     results: list[IGDBGameResult]

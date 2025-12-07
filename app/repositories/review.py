@@ -77,42 +77,50 @@ class ReviewRepository:
         await self.session.commit()
 
     async def get_top_rated_games(self, limit: int = 10) -> list[dict]:
-            """
-            Retorna:
-            - O Objeto Jogo (com capa e generos carregados)
-            - A Média calculada
-            - O Total de reviews
-            """
-            stmt = (
-                select(
-                    Jogo, 
-                    func.avg(Avaliacao.nota).label("media"),
-                    func.count(Avaliacao.id_avaliacao).label("total")
+                """
+                Retorna Top Jogos com detalhes expandidos (Empresas + Descrição).
+                """
+                stmt = (
+                    select(
+                        Jogo, 
+                        func.avg(Avaliacao.nota).label("media"),
+                        func.count(Avaliacao.id_avaliacao).label("total")
+                    )
+                    .join(Avaliacao, Jogo.id_jogo == Avaliacao.id_jogo)
+                    .options(
+                        selectinload(Jogo.generos),
+     
+                        joinedload(Jogo.desenvolvedora), 
+                        joinedload(Jogo.publicadora)
+                 
+                    )
+                    .group_by(Jogo.id_jogo)
+                    .order_by(desc("media"))
+                    .limit(limit)
                 )
-                .join(Avaliacao, Jogo.id_jogo == Avaliacao.id_jogo)
-                .options(selectinload(Jogo.generos)) # Carrega os gêneros associados
-                .group_by(Jogo.id_jogo) # Agrupa pelo ID do jogo
-                .order_by(desc("media"))
-                .limit(limit)
-            )
 
-            result = await self.session.execute(stmt)
-            
-            ranking = []
-            for row in result:
-                jogo_obj = row.Jogo
-                media_calc = row.media
-                total_calc = row.total
+                result = await self.session.execute(stmt)
                 
-                # Montamos o dicionário manualmente para o Pydantic,
-                # combinando dados do objeto Jogo com os dados calculados (agregados)
-                ranking.append({
-                    "id_jogo": jogo_obj.id_jogo,
-                    "titulo": jogo_obj.titulo,
-                    "capa_url": jogo_obj.capa_url,     # Pega do banco
-                    "generos": jogo_obj.generos,       # Pega do relacionamento
-                    "media": round(media_calc, 2),
-                    "total_reviews": total_calc
-                })
+                ranking = []
+                for row in result:
+                    jogo_obj = row.Jogo
+                    media_calc = row.media
+                    total_calc = row.total
+                    
+                    ranking.append({
+                        "id_jogo": jogo_obj.id_jogo,
+                        "titulo": jogo_obj.titulo,
+                        "capa_url": jogo_obj.capa_url,
+                        "generos": jogo_obj.generos,
+                        "media": round(media_calc, 2),
+                        "total_reviews": total_calc,
+                        
+     
+                        "descricao": jogo_obj.descricao,
                 
-            return ranking
+                        "desenvolvedora": jogo_obj.desenvolvedora, 
+                        "publicadora": jogo_obj.publicadora
+                      
+                    })
+                    
+                return ranking

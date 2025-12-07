@@ -268,16 +268,38 @@ class WatchlistService:
         else:
             metacritic_rating = None
 
+        developers = []
+        publishers = []
+        
+        companies = item.get("involved_companies", [])
+        if companies:
+            for entry in companies:
+                company_data = entry.get("company", {})
+                company_name = company_data.get("name")
+                
+                if company_name:
+                    if entry.get("developer"):
+                        developers.append(company_name)
+                    if entry.get("publisher"):
+                        publishers.append(company_name)
+        
+        dev_str = ", ".join(developers) if developers else None
+        pub_str = ", ".join(publishers) if publishers else None
+
+
         return IGDBGameResult(
             id=item["id"],
             name=item["name"],
             summary=item.get("summary"),
             cover_url=cover,
             screenshots=images_list,
-            videos=videos,
+            videos=videos, 
             genres=genres_list,
-            metacritic_rating=metacritic_rating 
+            metacritic_rating=metacritic_rating,
+            developer=dev_str,
+            publisher=pub_str
         )
+    
     async def remove_game_from_watchlist(self, user_id: int, watchlist_id: int, game_id: int):
 
         watchlist = await self.repository.get_watchlist_by_id(watchlist_id)

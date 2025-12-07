@@ -49,7 +49,7 @@ class IGDBClient:
 
             async with httpx.AsyncClient() as client:
                 
-                fields = "name, cover.url, summary, screenshots.url, artworks.url, videos.video_id, genres.name, aggregated_rating, total_rating_count"
+                fields = "name, cover.url, summary, screenshots.url, artworks.url, videos.video_id, genres.name, aggregated_rating, total_rating_count,involved_companies.company.name, involved_companies.developer, involved_companies.publisher"
                 
                 body = (
                     f'fields {fields}; '
@@ -186,7 +186,7 @@ class IGDBClient:
             if not genre_id:
                 return []
 
-            fields = "name, cover.url, summary, screenshots.url, artworks.url, videos.video_id, genres.name, total_rating_count, aggregated_rating"
+            fields = "name, cover.url, summary, screenshots.url, artworks.url, videos.video_id, genres.name, total_rating_count, aggregated_rating, involved_companies.company.name, involved_companies.developer, involved_companies.publisher"
             
             games_body = (
                 f'fields {fields}; '
@@ -218,7 +218,7 @@ class IGDBClient:
             "Authorization": f"Bearer {self.access_token}",
         }
 
-        fields = "name, cover.url, summary, screenshots.url, artworks.url, videos.video_id, genres.name, aggregated_rating, rating_count"
+        fields = "name, cover.url, summary, screenshots.url, artworks.url, videos.video_id, genres.name, aggregated_rating, rating_count, involved_companies.company.name, involved_companies.developer, involved_companies.publisher"
         
         
         body = (
