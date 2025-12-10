@@ -37,6 +37,7 @@ class GameDetailsPublic(BaseModel):
     nota_metacritic: int | None = None
     desenvolvedora: CompanyPublic | None = None
     publicadora: CompanyPublic | None = None
+    id_igdb: int | None = None
     cover_url: str | None = Field(default=None, validation_alias="capa_url")
     nota_usuario: float | None = None  
     media_geral: float | None = None  
@@ -95,6 +96,5 @@ class GameStatus(str, Enum):
 
 class UpdateGameStatus(BaseModel):
     new_status: GameStatus = Field(..., description="Novo status do jogo na watchlist.")
-
 
     
